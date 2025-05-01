@@ -43,6 +43,26 @@ public class Organization implements Serializable, Comparable<Organization> {
         this.officialAddress = officialAddress;
     }
 
+
+    public Organization(String name, Coordinates coordinates, float turnover, OrganizationType type, Address address, int id, ZonedDateTime creationDate) {
+        this.id = id;
+        this.creationDate = creationDate;
+    }
+
+    public Organization(String name,
+                        Coordinates coordinates,
+                        Float annualTurnover,
+                        OrganizationType type,
+                        Address officialAddress) {
+        this.id = idGenerator.getAndIncrement();
+        this.creationDate = ZonedDateTime.now();
+        this.name = name;
+        this.coordinates = coordinates;
+        this.annualTurnover = annualTurnover;
+        this.type = type;
+        this.officialAddress = officialAddress;
+    }
+
     @Override
     public int compareTo(Organization other) {
         return this.name.compareTo(other.name);
