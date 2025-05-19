@@ -123,4 +123,6 @@ public class Organization implements Serializable, Comparable<Organization> {
                 id, name, coordinates, annualTurnover, type != null ? type : "(нет типа)", officialAddress, creationDate
         );
     }
+
+
 }

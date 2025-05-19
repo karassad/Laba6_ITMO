@@ -26,7 +26,7 @@
     </repositories>
 
     <dependencies>
-        <!-- Jackson XML (версия 2.15.1 есть в Central) :contentReference[oaicite:0]{index=0} -->
+        <!-- Jackson -->
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-xml</artifactId>
@@ -38,24 +38,66 @@
             <version>2.15.1</version>
         </dependency>
 
-        <!-- Logback Classic (1.4.7 есть в Central) :contentReference[oaicite:1]{index=1} -->
+        <!-- SLF4J API 2.0.9 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+
+        <!-- Logback Classic 1.4.11 (реализация SLF4J) -->
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.7</version>
+            <version>1.4.11</version>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <!-- Плагин Javadoc уберите или обновите до 3.5.1, если он не нужен прямо сейчас -->
-            <!--
             <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-javadoc-plugin</artifactId>
-              <version>3.5.1</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>server.Server</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
-            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Указываем главный класс сервера -->
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>server.Server</mainClass>
+                                </transformer>
+                            </transformers>
+                            <!-- Убираем лишние META-INF -->
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>uber</shadedClassifierName>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
         </plugins>
     </build>
 </project>

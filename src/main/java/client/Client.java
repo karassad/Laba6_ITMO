@@ -1,59 +1,41 @@
 package client;
 
-import shared.Message;
-
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.net.*;
-import java.nio.charset.StandardCharsets;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
+/**
+ * Interactive UDP client for sending Requests to the server and receiving Responses.
+ * Uses ConsoleManager and RequestSender to implement a REPL.
+ */
 public class Client {
 
     public static void main(String[] args) {
+        // проверим, что нам передали хост и порт
+        if (args.length != 2) {
+            System.err.println("Usage: java client.Client <server-host> <server-port>");
+            System.exit(1);
+        }
 
-        //порт к которому будем подключаться
-        final int PORT = 9854;
-        try{
-            //создаем экземпляр сокета для клиента,
-            //не привязываем к определенному порту
-            DatagramSocket clientSocket = new DatagramSocket();
+        String host = args[0];
+        int port;
+        try {
+            port = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            System.err.println("Порт должен быть целым числом: " + args[1]);
+            return;
+        }
 
-            //получаем IP адрес сервера
-            InetAddress IPAddress = InetAddress.getByName("localhost");
-
-            byte[] receivingDataBuffer = new byte[1024];
-            byte[] sendingDataBuffer = new byte[1024];
-
-            String sent = "meow meow";
-            Message message = new Message("hello you");
-
-            //сериализуем передаваемое сообщение т.к udp работает не \
-            //с объектами а с массивом байт
-
-            ByteArrayOutputStream byteStream = new ByteArrayOutputStream();//временный поток для хранения байт
-            ObjectOutputStream os = new ObjectOutputStream(byteStream);//объект, которые сериализует и передает в поток
-            os.writeObject(message);
-            os.flush();
-//            sendingDataBuffer = sent.getBytes(StandardCharsets.UTF_8);
-
-            //создаем UDP пакет
-            DatagramPacket sendingDataPacket = new DatagramPacket(byteStream.toByteArray(), byteStream.size(), IPAddress, PORT);
-
-            //send packet to serv
-            clientSocket.send(sendingDataPacket);
-
-            clientSocket.close();
-
-
-
-
-        } catch (SocketException e) {
-            throw new RuntimeException(e);
+        try {
+            InetAddress addr = InetAddress.getByName(host);
+            // timeout 5 секунд, создаем сендер для отправки запросов
+            RequestSender sender = new RequestSender(addr, port, 5000);
+            ConsoleManager console = new ConsoleManager(sender);
+            console.run();
         } catch (UnknownHostException e) {
-            throw new RuntimeException(e);
+            System.err.println("Не удалось найти хост: " + host);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            System.err.println("Ошибка клиентского приложения: " + e.getMessage());
         }
     }
 }

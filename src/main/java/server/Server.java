@@ -1,164 +1,134 @@
 package server;
 
 import server.command.*;
-import shared.Message;
 import shared.Request;
 import shared.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 //import java.util.logging.Logger;
 //import java.util.logging.Level;
 //import java.util.logging.ConsoleHandler;
 //import java.util.logging.FileHandler;
-//import java.util.logging.SimpleFormatter; //логирвоание
+//import java.util.logging.SimpleFormatter; //логгирование
 
 import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 
 /**
  * Main server class.
  */
 public class Server {
-    // получаем логгер по имени класса
-//    private static final Logger logger = Logger.getLogger(Server.class.getName());
+    // SLF4J-логгер (Logback)
+    private static final Logger logger = LoggerFactory.getLogger(Server.class);
+
     public static void main(String[] args) {
+        logger.info("Запуск сервера…");
 
-
-        //Серверный UDP-сокет запущен на этом порту
+        //серверный UDP-порт
         final int PORT = 9854;
 
         try {
-
-            String filename = System.getenv("COLLECTION_FILE"); //переменная окружения для передачи имени файла
-            if (filename==null){
-                System.err.println("Переменная окружения COLLECTION_FILE не установлена.");
+            String filename = System.getenv("COLLECTION_FILE"); // имя CSV-файла из окружения
+            if (filename == null) {
+                logger.error("Переменная окружения COLLECTION_FILE не установлена.");
                 System.exit(1);
             }
 
-            CollectionManager collectionManager = new CollectionManager(filename); //передаем в менеджер файл для парсинга
-            collectionManager.load();    //парсинг
+            //Загрузка коллекции
+            CollectionManager collectionManager = new CollectionManager(filename);
+            collectionManager.load();
+            logger.info("Коллекция загружена из '{}', размер={}",
+                    filename, collectionManager.getCollection().size());
 
+            //Регистрируем shutdown-hook, чтобы при завершении JVM
+            //всегда попытаться сохранить коллекцию:
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                logger.info("JVM завершает работу — сохраняем коллекцию…");
+                try {
+                    collectionManager.save();
+                } catch (Exception e) {
+                    logger.error("Ошибка при сохранении коллекции в shutdown hook: {}", e.getMessage(), e);
+                }
+            }));
+
+            //Регистрация команд
             CommandManager commandManager = new CommandManager(
-                    (Command) new HelpCommand(),
-                    (Command) new InfoCommand(collectionManager),
-                    (Command) new ShowCommand(collectionManager),
-                    (Command) new AddCommand(collectionManager),
-                    (Command) new ClearCommand(collectionManager) //ДОРЕАЛИЗОВАТЬ
+                    new HelpCommand(),
+                    new InfoCommand(collectionManager),
+                    new ShowCommand(collectionManager),
+                    new AddCommand(collectionManager),
+                    new ClearCommand(collectionManager),
+                    new RemoveByIdCommand(collectionManager),
+                    new UpdateCommand(collectionManager),
+                    new SaveCommand(collectionManager),
+                    new PrintAscendingCommand(collectionManager),
+                    new AddIfMaxCommand(collectionManager),
+                    new RemoveGreaterCommand(collectionManager),
+                    new RemoveLowerCommand(collectionManager),
+                    new MinByCreationDateCommand(collectionManager),
+                    new FilterLessThanOfficialAddressCommand(collectionManager),
+                    new FilterGreaterThanTypeCommand(collectionManager)
             );
+            commandManager.register(new ExecuteScriptCommand(commandManager));
+            logger.info("Все команды зарегистрированы.");
 
-
-            //сетевой канал в неблокирующем режиме
-//           DatagramSocket serverSocket = new DatagramSocket(PORT);
-            DatagramChannel channel = DatagramChannel.open(); //открыли канал и подключили к порту
+            // Открытие канала в неблокирующем режиме
+            DatagramChannel channel = DatagramChannel.open();
             channel.bind(new InetSocketAddress(PORT));
-            channel.configureBlocking(false); //переключили на неблокирующий режим
-            System.out.println("Сервер запущен на порту "+ PORT);
+            channel.configureBlocking(false);
+            logger.info("Сервер запущен на порту {}", PORT);
 
-            ByteBuffer recvBuf = ByteBuffer.allocate(4096); //receiveBuffer (4096 байт)
-
-//            //буфферы для хранения отправляемых и получаемых данных
-//            byte[] receivingDataBuffer = new byte[1024];
-//            byte[] sendingDataBuffer = new byte[1024];
-
-            while(true){
-                try{ //Основной цикл обработки запросов
-
+            ByteBuffer recvBuf = ByteBuffer.allocate(4096);
+            while (true) {
+                try {
                     recvBuf.clear();
-                    SocketAddress clientAddr = channel.receive(recvBuf); //записываем в буффер инфу + сохраняем в
-                    //clientAddr адрес и порт отправителя
-
-                    // если null — данных нет, сразу переходим к следующей итерации
+                    SocketAddress clientAddr = channel.receive(recvBuf);
                     if (clientAddr == null) {
                         Thread.yield();
                         continue;
                     }
 
-                    //подготовка буффера к чтению
+                    logger.info("Получен пакет от {}", clientAddr);
+
+                    //Переводим буфер recvBuf из режима записи в режим чтения
                     recvBuf.flip();
-                    byte[] inBytes = new byte[recvBuf.remaining()]; //Выделяем ровно столько массива, сколько байт пришло
-                    recvBuf.get(inBytes); //чистает байты из буфера
+                    //Копируем содержимое буфера в массив байт, создаем буффер размера limit - position
+                    byte[] inBytes = new byte[recvBuf.remaining()];
+                    recvBuf.get(inBytes);
 
                     //Десериализация Request
                     Request request;
-                    try(ObjectInputStream is = new ObjectInputStream(new ByteArrayInputStream(inBytes))){
+                    try (ObjectInputStream is = new ObjectInputStream(new ByteArrayInputStream(inBytes))) {
                         request = (Request) is.readObject();
                     }
+                    logger.debug("Десериализован Request: {}", request.getCommandName());
 
-                    Response response = commandManager.execute(request); //отправляем в менеджер команду
+                    // Выполнение команды
+                    Response response = commandManager.execute(request);
 
-                    //Сериализация Response
+                    // Сериализация Response
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    try(ObjectOutputStream os = new ObjectOutputStream(baos)){
-                        os.writeObject(response); //создаем буфеер для байтов, упаковываем его в поток, в этот поток записываем нащ ответ
+                    try (ObjectOutputStream os = new ObjectOutputStream(baos)) {
+                        os.writeObject(response);
                     }
+                    byte[] outBytes = baos.toByteArray();
 
-                    byte[] outBytes  = baos.toByteArray(); //записываем просто байты
-
-                    //отправка клиенту
-                    ByteBuffer sendBuf = ByteBuffer.wrap(outBytes); //оборачиваем в буффер сообщение
+                    // Отправка ответа
+                    ByteBuffer sendBuf = ByteBuffer.wrap(outBytes);
                     channel.send(sendBuf, clientAddr);
-
-//                    //экземпляр UPD-пакета для хранения клиентских данных с
-//                    //с использованием буфера для получения данных
-//                    DatagramPacket inputPacket = new DatagramPacket(recvBuf, ;
-//                    System.out.println("Waiting for a client to connect...");
-//
-//                    //save into buffer
-//                    channel.receive(inputPacket);
-//                    System.out.println("Getting data, deserialization...");
-//
-//                    //десериализация (Преобразование байтов из пакета обратно в объект Request.)
-//                    ByteArrayInputStream byteStream = new ByteArrayInputStream(inputPacket.getData(), 0, inputPacket.getLength());
-//                    ObjectInputStream is = new ObjectInputStream(byteStream);
-//                    Request request = (Request) is.readObject();
-////                Message message = (Message) is.readObject();
-//
-//                    //выполнение команды
-//                    Response response = new Response(request);
-//
-//                    //Сериализация и отправка ответа
-//                    //Преобразование объекта Response в массив байтов.
-//                    recvBuf.clear();
-//                    ByteArrayOutputStream responseByteStream = new ByteArrayOutputStream();
-//                    ObjectOutputStream os = new ObjectOutputStream(responseByteStream);
-//                    os.writeObject(response);
-//                    os.flush();
-//                    sendingDataBuffer = responseByteStream.toByteArray();
-//                    //Отправка ответа клиенту на его IP и порт.
-//                    InetAddress clientAddress = inputPacket.getAddress(); //получаем Ip адресс клиента
-//                    int clientPort = inputPacket.getPort();//получаем порт клиента
-//                    DatagramPacket outputPacket = new DatagramPacket(sendingDataBuffer, sendingDataBuffer., clientAddress, clientPort);
-//                    serverSocket.send(outputPacket);
+                    logger.info("Отправлен ответ клиенту {}", clientAddr);
 
                 } catch (IOException | ClassNotFoundException e) {
-                    System.err.println("Ошибка обработки запроса: " + e.getMessage());
+                    logger.error("Ошибка обработки запроса: {}", e.getMessage(), e);
                 }
             }
 
         } catch (IOException e) {
-            System.err.println("Ошибка сервера: " + e.getMessage());
+            logger.error("Ошибка сервера: {}", e.getMessage(), e);
         }
     }
-
-//        // 1) Консольный хэндлер
-//        ConsoleHandler ch = new ConsoleHandler();
-//        ch.setLevel(Level.INFO);
-//        ch.setFormatter(new SimpleFormatter());
-//        logger.addHandler(ch); //прикрепляем к логгеру
-//
-//        // 2) Файловый хэндлер
-//        FileHandler fh = new FileHandler("server.log", true);
-//        fh.setLevel(Level.FINE);                // хотим видеть и FINE (аналог DEBUG)
-//        fh.setFormatter(new SimpleFormatter());
-//        logger.addHandler(fh);//прикрепляем к логгеру
-//
-//        // устанавливаем корневой уровень логгера
-//        logger.setLevel(Level.FINE);
-//    }
 }
-

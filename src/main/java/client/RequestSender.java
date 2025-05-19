@@ -15,7 +15,7 @@ import java.net.SocketTimeoutException;
  * Выполняет сериализацию объектов и десериализацию объектов.
  * Настраивает таймаут ожидания ответа
  */
-public class RequestSender {
+public class  RequestSender {
     private final InetAddress serverAddress;
     private final int serverPort;
     private final int timeoutMs;
@@ -37,29 +37,30 @@ public class RequestSender {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
              ObjectOutputStream oos = new ObjectOutputStream(baos)) {
             oos.writeObject(request);
-            oos.flush(); //проверяет, что все файлы точно вышли из буфферов oos baos
+            oos.flush(); //проверяет, что все файлы точно вышли из буфферов oos в baos
             requestBytes = baos.toByteArray();
         }
         
         //отправка
+        //создаем upd-сокет
         DatagramSocket socket = new DatagramSocket();
         socket.setSoTimeout(timeoutMs); //выбросит исключение, если по истечению времени не придет байтов
         DatagramPacket sendPacket = new DatagramPacket(requestBytes, requestBytes.length, serverAddress, serverPort);
         socket.send(sendPacket);
 
         // Приём ответа
-        byte[] buf = new byte[4096];
+        byte[] buf = new byte[4096]; //!!!!!!!!
         DatagramPacket receivePacket = new DatagramPacket(buf, buf.length);
         socket.receive(receivePacket);
         socket.close();
 
         // Десериализация Response
-        try(ObjectInputStream ois = new ObjectInputStream
-                (new ByteArrayInputStream
+        try(ObjectInputStream ois = new ObjectInputStream (new ByteArrayInputStream
                         (receivePacket.getData(),  //сам весь большой буффер
                                 0,  //откуда ничанаем читать
                                 receivePacket.getLength() //сколько байт в буфере действительно содержит полезную нагрузку
-                        ))){
+                        ))
+        ){
             return (Response) ois.readObject();
         }
 

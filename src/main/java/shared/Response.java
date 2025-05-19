@@ -13,6 +13,14 @@ public class Response implements Serializable {
         this.responseText = String.valueOf(responseText);
     }
 
+    /**
+     * Конструктор для простого текстового ответа.
+     * @param responseText строка-ответ от сервера
+     */
+    public Response(String responseText) {
+        this.responseText = responseText;
+    }
+
     public String getResponseText() {
         return responseText;
     }

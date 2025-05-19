@@ -22,4 +22,14 @@ public class Request implements Serializable {
     public Object getArgument() {
         return argument;
     }
+
+    public static Request parse(String line) {
+        String[] parts = line.split("\\s+", 2);
+        String cmd = parts[0];
+        String args = parts.length > 1 ? parts[1] : "";
+        // для примитивов и элементарных – можно упаковать как строку, Int и т.д.
+        // Здесь мы просто храним cmd и args, а разбор аргументов произойдёт в ConsoleManager на клиенте или в CommandManager на сервере:
+        return new Request(cmd, args);
+    }
+
 }

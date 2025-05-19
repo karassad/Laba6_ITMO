@@ -30,4 +30,8 @@ public class CommandManager {
         }
 
     }
+
+    public void register(Command cmd) {
+        commands.put(cmd.getName(), cmd);
+    }
 }

@@ -1,0 +1,10 @@
+help
+show
+add
+MyOrg
+1.1
+42
+100000.0
+COMMERCIAL
+12345
+show
