@@ -10,9 +10,22 @@ public class Request implements Serializable {
     private final String commandName;
     private final Object argument; // может быть id, Organization, String и т.п.
 
-    public Request(String commandName, Object argument) {
+    private final String username;
+    private final String password;
+
+    public Request(String commandName, Object argument, String username, String password) {
         this.commandName = commandName;
         this.argument = argument;
+        this.username = username;
+        this.password = password;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
     }
 
     public String getCommandName() {
@@ -23,13 +36,11 @@ public class Request implements Serializable {
         return argument;
     }
 
-    public static Request parse(String line) {
+    public static Request parse(String line, String username, String password) {
         String[] parts = line.split("\\s+", 2);
         String cmd = parts[0];
         String args = parts.length > 1 ? parts[1] : "";
-        // для примитивов и элементарных – можно упаковать как строку, Int и т.д.
-        // Здесь мы просто храним cmd и args, а разбор аргументов произойдёт в ConsoleManager на клиенте или в CommandManager на сервере:
-        return new Request(cmd, args);
+        return new Request(cmd, args, username, password);
     }
 
 }

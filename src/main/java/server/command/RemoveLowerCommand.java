@@ -4,11 +4,8 @@ import server.CollectionManager;
 import shared.Request;
 import shared.Response;
 import shared.model.Organization;
+import dataBase.UserManager;
 
-/**
- * Команда remove_lower: удаляет из коллекции все элементы,
- * строго меньшие заданного.
- */
 public class RemoveLowerCommand implements Command {
     private final CollectionManager cm;
 
@@ -22,11 +19,16 @@ public class RemoveLowerCommand implements Command {
         if (!(arg instanceof Organization)) {
             return new Response("Ошибка: remove_lower требует аргумент Organization.");
         }
+
         Organization ref = (Organization) arg;
-        int before = cm.getCollection().size();
-        cm.getCollection().removeIf(o -> o.compareTo(ref) < 0);
-        int removed = before - cm.getCollection().size();
-        return new Response("Удалено " + removed + " элементов.");
+        int userId = UserManager.getUserId(request.getUsername());
+        if (userId == -1) {
+            return new Response("Ошибка авторизации.");
+        }
+
+        int removed = cm.removeLower(ref, userId);
+
+        return new Response("Удалено " + removed + " ваших элементов, меньших заданного.");
     }
 
     @Override

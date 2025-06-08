@@ -19,6 +19,7 @@ public class ShowCommand implements Command{
 
     @Override
     public Response execute(Request request){
+
         String body = cm.getCollection().stream().map(Organization::toString).collect(Collectors.joining("\n---\n"));
         if (body.isEmpty()){
             body = "Коллекция пуста";

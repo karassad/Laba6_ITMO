@@ -9,6 +9,7 @@ import shared.model.OrganizationType;
 import shared.model.Coordinates;
 
 import javax.management.relation.RelationServiceNotRegisteredException;
+import java.io.Console;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -23,11 +24,22 @@ public class ConsoleManager {
     //используем интерфейс двусторонней очереди, реализуем через массив
     private final Deque<String> history = new ArrayDeque<>();
 
+    private String username;
+    private String password;
+
     public ConsoleManager(RequestSender requestSender) {
         this.requestSender = requestSender;
     }
 
     public void run() {
+
+         //запрос логина и пароля перед стартом
+        boolean authenticated = false;
+
+        while (!authenticated) {
+            authenticated = authenticate(); // пока не пройдёт успешно, остаёмся в цикле
+        }
+
         System.out.println("Введите команду (help для списка команд):");
         while (true) {
             //Приглашение без перехода на новую строку
@@ -83,7 +95,7 @@ public class ConsoleManager {
             case "clear":
             case "print_ascending":
             case "min_by_creation_date":
-                return new Request(cmd, null);
+                return new Request(cmd, null, username, password);
 
             case "exit":
                 System.out.println("Завершаем работу без сохранения.");
@@ -93,35 +105,35 @@ public class ConsoleManager {
             case "remove_by_id":
                 if (args.isEmpty()) {
                     System.out.println("Ошибка: команда remove_by_id требует аргумент id.");
-                    return new Request("help", null);
+                    return new Request("help", null, username, password);
                 }
-                return new Request(cmd, Integer.parseInt(args));
+                return new Request(cmd, Integer.parseInt(args), username, password);
 
             case "filter_less_than_official_address":
                 if (args.isEmpty()) {
                     System.out.println("Ошибка: требуется zipCode.");
-                    return new Request("help", null);
+                    return new Request("help", null, username, password);
                 }
-                return new Request(cmd, args);
+                return new Request(cmd, args, username, password);
 
             case "filter_greater_than_type":
                 if (args.isEmpty()) {
                     System.out.println("Ошибка: требуется тип (e.g. COMMERCIAL).");
-                    return new Request("help", null);
+                    return new Request("help", null, username, password);
                 }
                 try {
-                    return new Request(cmd, OrganizationType.valueOf(args.trim().toUpperCase()));
+                    return new Request(cmd, OrganizationType.valueOf(args.trim().toUpperCase()), username, password);
                 } catch (IllegalArgumentException ex) {
                     System.out.println("Неверный тип организации. Повторите ввод.");
-                    return new Request("help", null);
+                    return new Request("help", null, username, password);
                 }
 
             case "execute_script":
                 if (args.isEmpty()) {
                     System.out.println("Ошибка: команда execute_script требует аргумент.");
-                    return new Request("help", null);
+                    return new Request("help", null, username, password);
                 }
-                return new Request(cmd, args);
+                return new Request(cmd, args, username, password);
 
             //нужен объект Organization
             case "add":
@@ -129,21 +141,21 @@ public class ConsoleManager {
             case "add_if_max":
             case "remove_lower":
             case "remove_greater":
-                return new Request(cmd, readOrganization());
+                return new Request(cmd, readOrganization(), username, password);
 
             case "update":
                 if (args.isEmpty()) {
                     System.out.println("Ошибка: после update должен идти числовой id.");
-                    return new Request("help", null);
+                    return new Request("help", null, username, password);
                 }
                 int id = Integer.parseInt(args);
                 System.out.println("Введите новые данные для организации с id=" + id + ":");
                 Organization newOrg = readOrganization();
-                return new Request("update", new Object[]{id, newOrg});
+                return new Request("update", new Object[]{id, newOrg}, username, password);
 
             default:
                 System.out.println("Неизвестная команда. Введите help.");
-                return new Request("help", null);
+                return new Request("help", null, username, password);
         }
     }
 
@@ -250,5 +262,56 @@ public class ConsoleManager {
         //Собираем и возвращаем новый объект
         return new Organization(name, coords, turnover, type, address);
     }
+
+    public boolean authenticate() {
+        Console console = System.console();
+
+        while (true) {
+            System.out.println("Выберите действие: [1] Вход  [2] Регистрация");
+            String choice;
+            do {
+                System.out.print("Ваш выбор: ");
+                choice = scanner.nextLine().trim();
+            } while (!choice.equals("1") && !choice.equals("2"));
+
+            boolean isRegister = choice.equals("2");
+
+            System.out.print("Введите логин: ");
+            username = scanner.nextLine().trim();
+
+            if (console != null) {
+                char[] passwordChars = console.readPassword("Введите пароль: ");
+                password = new String(passwordChars);
+            } else {
+                System.out.print("Введите пароль: ");
+                password = scanner.nextLine().trim();
+            }
+
+            String action = isRegister ? "register" : "login";
+            Request authRequest = new Request(action, null, username, password);
+
+            try {
+                Response response = requestSender.send(authRequest);
+                System.out.println(response.getResponseText());
+
+                if (!response.getResponseText().toLowerCase().contains("ошибка")) {
+                    return true; //входим в основное меню
+                } else {
+                    System.out.println("Попробуйте ещё раз.\n");
+                }
+
+            } catch (Exception e) {
+                System.out.println("Ошибка при попытке авторизации: " + e.getMessage());
+                System.out.println("Попробуйте снова.\n");
+            }
+        }
+    }
+
+
+
+
+
+
+
 
 }

@@ -66,7 +66,7 @@ public class ExecuteScriptCommand implements Command {
                     case "remove_greater": {
                         // скрипт должен сразу содержать 6 строчек с полями
                         Organization org = readOrgFromScript(reader);
-                        resp = cmdMgr.execute(new Request(cmd, org));
+                        resp = cmdMgr.execute(new Request(cmd, arg, request.getUsername(), request.getPassword()));
                         break;
                     }
                     case "update": {
@@ -74,13 +74,15 @@ public class ExecuteScriptCommand implements Command {
                         int id = Integer.parseInt(arg);
                         // следующие 6 строчек — новое состояние
                         Organization newOrg = readOrgFromScript(reader);
-                        resp = cmdMgr.execute(new Request("update", new Object[]{id, newOrg}));
+                        resp = cmdMgr.execute(new Request("update", new Object[]{id, newOrg}, request.getUsername(), request.getPassword()));
+
                         break;
                     }
                     default: {
                         // всё остальное (info, show, remove_by_id, execute_script вложенный...)
                         Object argument = arg.isEmpty() ? null : arg;
-                        resp = cmdMgr.execute(new Request(cmd, argument));
+                        resp = cmdMgr.execute(new Request(cmd, argument, request.getUsername(), request.getPassword()));
+
                     }
                 }
 

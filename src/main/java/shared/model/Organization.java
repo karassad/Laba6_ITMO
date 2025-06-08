@@ -21,6 +21,8 @@ public class Organization implements Serializable, Comparable<Organization> {
     private  OrganizationType type;
     private Address officialAddress;
 
+    private int userId; //для клиента
+
     public Organization(int id, ZonedDateTime creationDate, String name, Coordinates coordinates, Float annualTurnover, OrganizationType type, Address officialAddress) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Имя организации не может быть пустым или null.");
@@ -119,10 +121,21 @@ public class Organization implements Serializable, Comparable<Organization> {
     @Override
     public String toString() {
         return String.format(
-                "Организация #%d (%s)\nКоординаты: %s\nОборот: %.2f\nТип: %s\nАдрес: %s\nСоздано: %s",
-                id, name, coordinates, annualTurnover, type != null ? type : "(нет типа)", officialAddress, creationDate
+                "Организация #%d (%s)\nКоординаты: %s\nОборот: %.2f\nТип: %s\nАдрес: %s\nСоздано: %s\nID пользователя: %s",
+                id, name, coordinates, annualTurnover, type != null ? type : "(нет типа)", officialAddress, creationDate, userId
         );
     }
 
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    public void setId(int userIdid) {
+        this.userId = id;
+    }
 
 }
